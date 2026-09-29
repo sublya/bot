@@ -27,7 +27,8 @@ def main() -> None:
     ap.add_argument("-o", "--output", type=Path, help="default: <video>.subs.mp4")
     ap.add_argument("--text", type=Path, help="reference text; its line breaks become page breaks")
     ap.add_argument("--style", choices=STYLES, default=DEFAULT_STYLE)
-    ap.add_argument("--lang", help="default: autodetect")
+    ap.add_argument("--lang", default=os.environ.get("DEFAULT_LANG", "ru") or "auto",
+                    help="speech language, or auto; default: DEFAULT_LANG or ru")
     ap.add_argument("--lag", type=float, default=float(os.environ["STT_LAG"]) if os.environ.get("STT_LAG") else None,
                     help="how late the recogniser places word starts, seconds; default depends on the timing kind")
     ap.add_argument("--retranscribe", action="store_true", help="ignore the cached transcript")
@@ -43,7 +44,8 @@ def main() -> None:
         cfg = SttConfig.from_env()
         if not cfg.key:
             sys.exit("set STT_API_KEY")
-        transcript = asyncio.run(transcribe(video, work, cfg, args.lang))
+        lang = None if args.lang == "auto" else args.lang
+        transcript = asyncio.run(transcribe(video, work, cfg, lang))
         cached.write_text(transcript.to_json(), encoding="utf-8")
     else:
         transcript = Transcript.from_json(cached.read_text(encoding="utf-8"))
