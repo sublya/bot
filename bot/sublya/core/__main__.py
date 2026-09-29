@@ -4,8 +4,8 @@ The recognised transcript is cached in work/<video>/transcript.json, so reruns w
 different --text or --style skip recognition.
 
 Usage:
-  python -m sablya.core IMG_4476.MOV
-  python -m sablya.core IMG_4476.MOV --text poem.txt --style big
+  python -m sublya.core IMG_4476.MOV
+  python -m sublya.core IMG_4476.MOV --text poem.txt --style big
 """
 
 import argparse

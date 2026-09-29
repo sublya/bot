@@ -2,10 +2,10 @@ import re
 
 import pytest
 
-from sablya.core.align import normalize
-from sablya.core.ffmpeg import has_filter, run, tool
-from sablya.core.models import STYLES, Word
-from sablya.core.render import HIGHLIGHT, burn, write_ass
+from sublya.core.align import normalize
+from sublya.core.ffmpeg import has_filter, run, tool
+from sublya.core.models import STYLES, Word
+from sublya.core.render import HIGHLIGHT, burn, write_ass
 
 DIALOGUE = re.compile(r"^Dialogue: (\d+),([\d:.]+),([\d:.]+),[^,]*,[^,]*,\d+,\d+,\d+,[^,]*,(.*)$")
 
@@ -55,7 +55,7 @@ def test_escapes_override_braces(tmp_path):
 @pytest.mark.parametrize("style", STYLES)
 def test_libass_renders_a_frame(tmp_path, words, style):
     if not has_filter("ass"):
-        pytest.skip("ffmpeg without libass (set SABLYA_FFMPEG)")
+        pytest.skip("ffmpeg without libass (set SUBLYA_FFMPEG)")
     video = tmp_path / "in.mp4"
     run(tool("ffmpeg"), "-v", "error", "-f", "lavfi", "-i", "color=c=gray:s=270x480:d=20:r=5",
         "-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono", "-t", "20", "-shortest",

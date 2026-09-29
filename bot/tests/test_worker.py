@@ -3,12 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from sablya.bot import texts
-from sablya.bot.config import Settings
-from sablya.bot.db import Db
-from sablya.bot.worker import Worker, cleanup
-from sablya.core.ffmpeg import has_filter, run, tool
-from sablya.core.transcribe import SttConfig
+from sublya.bot import texts
+from sublya.bot.config import Settings
+from sublya.bot.db import Db
+from sublya.bot.worker import Worker, cleanup
+from sublya.core.ffmpeg import has_filter, run, tool
+from sublya.core.transcribe import SttConfig
 
 
 class FakeBot:
@@ -32,7 +32,7 @@ class FakeBot:
 async def env(tmp_path):
     settings = Settings(bot_token="t", data_dir=tmp_path, admin_ids=frozenset({99}),
                         stt=SttConfig(key="k"))
-    db = await Db.open(tmp_path / "sablya.db")
+    db = await Db.open(tmp_path / "sublya.db")
     bot = FakeBot()
     yield settings, db, bot, Worker(bot, db, settings)
     await db.close()
@@ -57,7 +57,7 @@ async def test_missing_video_expires(env):
 
 async def test_rerender_uses_cached_transcript(env, transcript, poem):
     if not has_filter("ass"):
-        pytest.skip("ffmpeg without libass (set SABLYA_FFMPEG)")
+        pytest.skip("ffmpeg without libass (set SUBLYA_FFMPEG)")
     settings, db, bot, worker = env
     work = settings.jobs_dir / "1"
     work.mkdir(parents=True)

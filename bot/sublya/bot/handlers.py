@@ -8,7 +8,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
-from sablya.core import STYLES, Transcript
+from sublya.core import STYLES, Transcript
 
 from . import texts
 from .config import MB, Settings

@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from sablya.core.align import align
-from sablya.core.models import Transcript, Word
+from sublya.core.align import align
+from sublya.core.models import Transcript, Word
 
 FIXTURE = Path(__file__).parent / "fixtures" / "natasha"
 LAG = 0.15  # whisper.cpp DTW marks tokens a bit late

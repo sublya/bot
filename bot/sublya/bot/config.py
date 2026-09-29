@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sablya.core.transcribe import SttConfig
+from sublya.core.transcribe import SttConfig
 
 MB = 1024 * 1024
 # the public Bot API refuses to hand out files bigger than this

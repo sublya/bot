@@ -1,5 +1,5 @@
 [project]
-name = "sablya"
+name = "sublya"
 version = "0.1.0"
 description = "Telegram bot that burns TikTok-style word-highlighted subtitles into videos"
 readme = "README.md"
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sablya-bot = "sablya.bot.main:main"
+sublya-bot = "sublya.bot.main:main"
 
 [build-system]
 requires = ["uv_build>=0.12.9,<0.13.0"]

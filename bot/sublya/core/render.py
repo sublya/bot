@@ -107,7 +107,7 @@ def filter_arg(path: Path) -> str:
 
 def burn(video: Path, ass: Path, out: Path, extra: list[str] | None = None) -> None:
     vf = f"ass={filter_arg(ass)}"
-    if fonts := os.environ.get("SABLYA_FONTS_DIR"):
+    if fonts := os.environ.get("SUBLYA_FONTS_DIR"):
         vf += f":fontsdir={filter_arg(Path(fonts))}"
     run(tool("ffmpeg"), "-y", "-v", "error", "-i", str(video), "-vf", vf,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",

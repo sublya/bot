@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from sablya.core.transcribe import NoSpeech, SttConfig, SttError, recognize
+from sublya.core.transcribe import NoSpeech, SttConfig, SttError, recognize
 
 CFG = SttConfig(url="https://stt.test/v1", key="k", model="whisper-x")
 RESPONSE = {

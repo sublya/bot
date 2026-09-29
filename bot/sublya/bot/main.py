@@ -30,7 +30,7 @@ async def run() -> None:
     if settings.api_url:
         session = AiohttpSession(api=TelegramAPIServer.from_base(settings.api_url, is_local=True))
     bot = Bot(settings.bot_token, session=session)
-    db = await Db.open(settings.data_dir / "sablya.db")
+    db = await Db.open(settings.data_dir / "sublya.db")
     worker = Worker(bot, db, settings)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)

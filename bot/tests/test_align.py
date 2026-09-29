@@ -1,7 +1,7 @@
 import pytest
 
-from sablya.core.align import align, paginate, read_text, snap
-from sablya.core.models import Transcript
+from sublya.core.align import align, paginate, read_text, snap
+from sublya.core.models import Transcript
 
 from .conftest import LAG
 

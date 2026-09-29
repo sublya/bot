@@ -1,42 +1,41 @@
-# sablya
+# Sublya
 
-Telegram bot that burns TikTok-style subtitles with the spoken word highlighted.
+A Telegram bot that burns TikTok-style subtitles into a video: two or three words on screen,
+the word being spoken lit up. Send it a video, get the same video back with subtitles.
 
-Send it a video and it replies with the same video, two or three words on screen at a time.
-A caption with the exact text (a poem, a script) replaces what was heard: the wording comes
-from the caption, the timings from the speech. The reply has buttons to fix the text or
-switch the style without recognising the audio again.
+Try it: [@sublyarobot](https://t.me/sublyarobot) · site: [sublya.aimuzov.online](https://sublya.aimuzov.online)
 
-## Run it
+- **Timing that holds.** Recognised word times are snapped to the pauses in the audio, so
+  words light up when they're said, not a quarter of a second off.
+  How: [docs/alignment.md](docs/alignment.md).
+- **Your exact text.** Put a poem or a script in the video caption: the screen shows its words,
+  the timings come from the speech. Mumbled, skipped or extra words don't break the sync.
+- **Fix without re-recognising.** Buttons under the result let you correct the text or pick
+  another style; the video is re-rendered from the cached transcript.
+- **Four styles.** Classic yellow highlight, bigger text, a coloured plate under the current
+  word, or one word at a time.
+- **Cheap to run.** Recognition goes to Whisper through OpenRouter (about $0.0002 per minute),
+  rendering is ffmpeg on the CPU. A 1 vCPU box is enough.
+
+## Repository
+
+| Path | What |
+|---|---|
+| [`bot/`](bot) | the bot and the subtitle engine, Python; its README covers setup and configuration |
+| [`site/`](site) | the landing page, static HTML |
+| [`deploy/`](deploy) | production compose file and deploy script |
+| [`docs/`](docs) | how word timings work, how deployment works |
+
+## Quick start
 
 ```bash
-cp .env.example .env
-```
-
-Fill in `BOT_TOKEN`, `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` from my.telegram.org and
-`STT_API_KEY`. The bot talks to a local Bot API server, since the public one won't hand out
-files over 20 MB. A bot that has been polling the public API has to be logged out of it once:
-
-```bash
-curl https://api.telegram.org/bot$BOT_TOKEN/logOut
-```
-
-```bash
+cd bot
+cp .env.example .env   # BOT_TOKEN, STT_API_KEY, TELEGRAM_API_ID, TELEGRAM_API_HASH
 docker compose up -d --build
 ```
 
-## CLI
+Details in [bot/README.md](bot/README.md), production setup in [docs/deploy.md](docs/deploy.md).
 
-The core works without Telegram. It needs ffmpeg with libass; on macOS that's `ffmpeg-full`.
+## License
 
-```bash
-SABLYA_FFMPEG=/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg SABLYA_FFPROBE=/opt/homebrew/opt/ffmpeg-full/bin/ffprobe uv run --env-file .env python -m sablya.core video.mov --text poem.txt --style big
-```
-
-## Tests
-
-```bash
-uv run pytest
-```
-
-Render tests are skipped unless `SABLYA_FFMPEG` points to an ffmpeg with libass.
+[MIT](LICENSE)

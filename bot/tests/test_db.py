@@ -1,6 +1,6 @@
 import pytest
 
-from sablya.bot.db import Busy, Db, QuotaExceeded
+from sublya.bot.db import Busy, Db, QuotaExceeded
 
 
 class Clock:
@@ -14,7 +14,7 @@ class Clock:
 @pytest.fixture
 async def db(tmp_path):
     clock = Clock()
-    d = await Db.open(tmp_path / "sablya.db", clock=clock)
+    d = await Db.open(tmp_path / "sublya.db", clock=clock)
     d.clock_ = clock
     yield d
     await d.close()

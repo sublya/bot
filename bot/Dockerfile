@@ -12,10 +12,10 @@ WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY README.md ./
-COPY sablya ./sablya
+COPY sublya ./sublya
 RUN uv sync --frozen --no-dev
 
 ENV PATH=/app/.venv/bin:$PATH \
     DATA_DIR=/data \
-    SABLYA_FONTS_DIR=/usr/share/fonts/opentype/montserrat
-CMD ["sablya-bot"]
+    SUBLYA_FONTS_DIR=/usr/share/fonts/opentype/montserrat
+CMD ["sublya-bot"]

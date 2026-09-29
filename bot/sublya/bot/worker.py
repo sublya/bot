@@ -10,9 +10,9 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import FSInputFile, InlineKeyboardButton, InlineKeyboardMarkup
 
-from sablya.core import NoSpeech, SttError, Transcript, align, render, transcribe
-from sablya.core.audio import duration
-from sablya.core.ffmpeg import FFmpegError
+from sublya.core import NoSpeech, SttError, Transcript, align, render, transcribe
+from sublya.core.audio import duration
+from sublya.core.ffmpeg import FFmpegError
 
 from . import texts
 from .config import Settings
@@ -102,7 +102,7 @@ class Worker:
         try:
             w, h = transcript.size
             await self.bot.send_video(
-                job.chat_id, FSInputFile(out, filename="sablya.mp4"),
+                job.chat_id, FSInputFile(out, filename="sublya.mp4"),
                 width=w, height=h, duration=round(transcript.duration),
                 supports_streaming=True, reply_markup=result_keyboard(job.id),
             )

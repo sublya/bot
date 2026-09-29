@@ -13,10 +13,10 @@ class FFmpegError(RuntimeError):
 
 
 def tool(name: str) -> str:
-    """SABLYA_FFMPEG/SABLYA_FFPROBE win over PATH: Homebrew's ffmpeg lacks libass."""
-    path = os.environ.get(f"SABLYA_{name.upper()}") or shutil.which(name)
+    """SUBLYA_FFMPEG/SUBLYA_FFPROBE win over PATH: Homebrew's ffmpeg lacks libass."""
+    path = os.environ.get(f"SUBLYA_{name.upper()}") or shutil.which(name)
     if not path:
-        raise FileNotFoundError(f"{name} not found, set SABLYA_{name.upper()}")
+        raise FileNotFoundError(f"{name} not found, set SUBLYA_{name.upper()}")
     return path
 
 

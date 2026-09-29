@@ -9,7 +9,7 @@ from pathlib import Path
 
 import aiosqlite
 
-from sablya.core.models import DEFAULT_STYLE
+from sublya.core.models import DEFAULT_STYLE
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
