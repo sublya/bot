@@ -1,30 +1,9 @@
-import json
-from pathlib import Path
-
 import pytest
 
 from sablya.core.align import align, paginate, read_text, snap
-from sablya.core.models import Transcript, Word
+from sablya.core.models import Transcript
 
-FIXTURE = Path(__file__).parent / "fixtures" / "natasha"
-LAG = 0.15  # whisper.cpp DTW marks tokens a bit late
-
-
-@pytest.fixture
-def transcript() -> Transcript:
-    words = [Word(**w) for w in json.loads((FIXTURE / "words.json").read_text())]
-    meta = json.loads((FIXTURE / "silences.json").read_text())
-    return Transcript(
-        words=words,
-        silences=[tuple(p) for p in meta["silences"]],
-        size=(1080, 1920),
-        duration=meta["duration"],
-    )
-
-
-@pytest.fixture
-def poem() -> str:
-    return (FIXTURE / "poem.txt").read_text(encoding="utf-8")
+from .conftest import LAG
 
 
 def test_snap_moves_word_start_to_pause_end(transcript):
