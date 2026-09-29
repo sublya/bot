@@ -1,0 +1,31 @@
+[project]
+name = "sablya"
+version = "0.1.0"
+description = "Telegram bot that burns TikTok-style word-highlighted subtitles into videos"
+readme = "README.md"
+authors = [
+    { name = "Aleksey Imuzov", email = "github@aimuzov.online" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3",
+    "aiosqlite>=0.22.1",
+    "httpx>=0.28.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
