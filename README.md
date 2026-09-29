@@ -56,6 +56,8 @@ otherwise the local server can't take it over:
 curl https://api.telegram.org/bot$BOT_TOKEN/logOut
 ```
 
+Production runs behind a SOCKS tunnel on a shared VPS: [docs/deploy.md](docs/deploy.md).
+
 ## Configuration
 
 Everything comes from the environment; `.env.example` lists it.
