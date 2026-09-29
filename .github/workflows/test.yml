@@ -5,11 +5,8 @@ on:
   pull_request:
 
 jobs:
-  bot:
+  test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: bot
     steps:
       - uses: actions/checkout@v4
       # Ubuntu's ffmpeg is built with libass, so the render tests run too

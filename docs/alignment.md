@@ -26,7 +26,7 @@ starts at the end of that pause; otherwise the mark is moved 0.15 s earlier. The
 used this, and the test fixture keeps it as the reference.
 
 Both offsets are the defaults of `STT_LAG`. They were fitted on
-`bot/tests/fixtures/natasha`, a 55-second recitation checked frame by frame: after snapping,
+`tests/fixtures/natasha`, a 55-second recitation checked frame by frame: after snapping,
 Whisper API timings are 0.08 s from the reference on average and never more than 0.5 s.
 
 A word ends where the first pause after it begins, or where the next word starts.
