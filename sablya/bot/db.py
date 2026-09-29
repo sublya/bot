@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     chat_id INTEGER NOT NULL,
     parent_id INTEGER REFERENCES jobs(id),
     status TEXT NOT NULL,
-    input_path TEXT NOT NULL,
+    input_path TEXT,
     text TEXT,
     style TEXT NOT NULL,
     lang TEXT,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS usage (
 );
 """
 
-ACTIVE = ("queued", "running")
+ACTIVE = ("pending", "queued", "running")
 
 
 class Busy(Exception):
@@ -61,7 +61,7 @@ class Job:
     chat_id: int
     parent_id: int | None
     status: str
-    input_path: str
+    input_path: str | None
     text: str | None
     style: str
     lang: str | None
@@ -133,13 +133,15 @@ class Db:
         return row["videos"] if row else 0
 
     async def submit(
-        self, *, user_id: int, chat_id: int, input_path: str, text: str | None, style: str,
+        self, *, user_id: int, chat_id: int, input_path: str | None, text: str | None, style: str,
         lang: str | None, parent_id: int | None, daily_limit: int,
     ) -> int:
-        """Queues a job. Re-renders (with parent_id) don't count against the daily quota."""
+        """Queues a job. Re-renders (with parent_id) don't count against the daily quota.
+        Without input_path the job stays pending until ready(), so the worker never sees a
+        job whose video is still downloading."""
         async with self._transaction():
             active = await self._one(
-                "SELECT 1 FROM jobs WHERE user_id = ? AND status IN (?, ?)", user_id, *ACTIVE
+                "SELECT 1 FROM jobs WHERE user_id = ? AND status IN (?, ?, ?)", user_id, *ACTIVE
             )
             if active:
                 raise Busy
@@ -153,8 +155,8 @@ class Db:
                 )
             cur = await self.conn.execute(
                 "INSERT INTO jobs (user_id, chat_id, parent_id, status, input_path, text, style,"
-                " lang, created_at) VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?)",
-                (user_id, chat_id, parent_id, input_path, text, style, lang, self.clock()),
+                " lang, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, chat_id, parent_id, "queued" if input_path else "pending", input_path, text, style, lang, self.clock()),
             )
             return cur.lastrowid
 
@@ -181,7 +183,19 @@ class Db:
             (status, error, self.clock(), job_id),
         )
 
+    async def ready(self, job_id: int, input_path: str) -> None:
+        await self.conn.execute(
+            "UPDATE jobs SET status = 'queued', input_path = ? WHERE id = ? AND status = 'pending'",
+            (input_path, job_id),
+        )
+
     async def requeue_running(self) -> int:
+        """After a restart: interrupted jobs go back to the queue, unfinished downloads fail."""
+        await self.conn.execute(
+            "UPDATE jobs SET status = 'failed', error = 'restarted during download',"
+            " finished_at = ? WHERE status = 'pending'",
+            (self.clock(),),
+        )
         cur = await self.conn.execute("UPDATE jobs SET status = 'queued' WHERE status = 'running'")
         return cur.rowcount
 

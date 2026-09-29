@@ -121,3 +121,21 @@ async def test_stats(db):
     stats = await db.stats()
     assert stats["videos_today"] == 2 and stats["queued"] == 1 and stats["failed_today"] == 1
     assert stats["stt_minutes_today"] == 1.5
+
+
+async def test_pending_job_waits_for_its_file(db):
+    job = await db.submit(user_id=1, chat_id=1, input_path=None, text=None, style="classic",
+                          lang=None, parent_id=None, daily_limit=10)
+    assert await db.next_job() is None
+    with pytest.raises(Busy):
+        await submit(db, 1)
+    await db.ready(job, "data/jobs/1/input.mp4")
+    taken = await db.next_job()
+    assert (taken.id, taken.input_path) == (job, "data/jobs/1/input.mp4")
+
+
+async def test_restart_fails_pending_jobs(db):
+    job = await db.submit(user_id=1, chat_id=1, input_path=None, text=None, style="classic",
+                          lang=None, parent_id=None, daily_limit=10)
+    await db.requeue_running()
+    assert (await db.get_job(job)).status == "failed"
