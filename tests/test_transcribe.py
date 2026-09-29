@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from sublya.core.transcribe import NoSpeech, SttConfig, SttError, recognize
+from sublya.core.transcribe import NoSpeech, SttConfig, SttError, parse, recognize
 
 CFG = SttConfig(url="https://stt.test/v1", key="k", model="whisper-x")
 RESPONSE = {
@@ -84,3 +84,31 @@ async def test_missing_word_timestamps_is_an_error(audio):
     c = client(httpx.Response(200, json={"text": "Я хочу"}))
     with pytest.raises(SttError, match="word"):
         await recognize(audio, CFG, client=c)
+
+
+def response(*words: str) -> dict:
+    return {
+        "text": " ".join(words),
+        "words": [{"word": w, "start": i * 0.5, "end": i * 0.5 + 0.4} for i, w in enumerate(words)],
+    }
+
+
+def texts_of(words) -> list[str]:
+    return [w.text for w in words]
+
+
+def test_drops_subtitle_credits_whisper_hallucinates_at_the_edges():
+    heard = parse(response("Продолжение", "следует...", "Братишки,", "хочу", "порекомендовать",
+                           "бота.", "Субтитры", "сделал", "DimaTorzok"))
+    assert texts_of(heard) == ["Братишки,", "хочу", "порекомендовать", "бота."]
+    assert heard[0].start == 1.0
+
+
+def test_keeps_the_same_words_in_the_middle():
+    heard = parse(response("Я", "сказал:", "продолжение", "следует,", "и", "ушёл."))
+    assert texts_of(heard) == ["Я", "сказал:", "продолжение", "следует,", "и", "ушёл."]
+
+
+def test_only_a_hallucination_means_no_speech():
+    with pytest.raises(NoSpeech):
+        parse(response("Продолжение", "следует..."))

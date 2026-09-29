@@ -8,7 +8,7 @@ from pathlib import Path
 
 import httpx
 
-from .align import apply_text, read_text
+from .align import apply_text, normalize, read_text
 from .audio import duration, extract_audio, silences, video_size
 from .models import Transcript, Word
 
@@ -41,6 +41,35 @@ class SttConfig:
         )
 
 
+# Whisper learned from subtitle files, and over silence or noise at the start or end of a
+# recording it writes their credits. Nobody says these in a video, unlike "thank you".
+HALLUCINATIONS = [
+    phrase.split()
+    for phrase in (
+        "продолжение следует",
+        "субтитры сделал dimatorzok",
+        "субтитры создавал dimatorzok",
+        "субтитры подогнал симон",
+        "редактор субтитров асемкин корректор аегорова",
+    )
+]
+
+
+def drop_hallucinations(words: list[Word]) -> list[Word]:
+    keys = [normalize(w.text) for w in words]
+    start, end = 0, len(words)
+    trimmed = True
+    while trimmed:
+        trimmed = False
+        for phrase in HALLUCINATIONS:
+            n = len(phrase)
+            if end - start >= n and keys[start:start + n] == phrase:
+                start, trimmed = start + n, True
+            if end - start >= n and keys[end - n:end] == phrase:
+                end, trimmed = end - n, True
+    return words[start:end]
+
+
 def parse(data: dict) -> list[Word]:
     if "words" not in data:
         raise SttError("the STT response has no word timestamps")
@@ -49,14 +78,15 @@ def parse(data: dict) -> list[Word]:
         for w in data["words"]
         if w["word"].strip()
     ]
-    if not heard:
-        raise NoSpeech("no speech recognised")
     # words come without punctuation; the full text has it
     ref = read_text(data.get("text", ""))
-    if not ref:
-        return heard
-    ref[-1].line_end = False
-    return apply_text(heard, ref)
+    if ref:
+        ref[-1].line_end = False
+        heard = apply_text(heard, ref)
+    heard = drop_hallucinations(heard)
+    if not heard:
+        raise NoSpeech("no speech recognised")
+    return heard
 
 
 async def post(
