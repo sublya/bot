@@ -17,7 +17,7 @@ services:
       - /dev/net/tun:/dev/net/tun
     environment:
       PROXY: socks5://host.docker.internal:1080
-      LOGLEVEL: warning
+      LOGLEVEL: warn
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     logging: &logging
