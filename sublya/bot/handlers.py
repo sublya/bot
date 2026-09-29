@@ -23,7 +23,19 @@ class FixText(StatesGroup):
     waiting = State()
 
 
-def lang_name(lang: str | None) -> str:
+AUTO = "auto"
+
+
+def stt_lang(chosen: str | None, default: str | None) -> str | None:
+    """The language hint for recognition. users.lang is NULL until the user picks one in
+    /lang, and "auto" when they picked autodetection on purpose."""
+    if chosen == AUTO:
+        return None
+    return chosen or default
+
+
+def lang_name(chosen: str | None, default: str | None) -> str:
+    lang = stt_lang(chosen, default)
     return texts.LANG_NAMES.get(lang, lang) if lang else texts.LANG_AUTO
 
 
@@ -65,27 +77,28 @@ async def set_style(query: CallbackQuery, db: Db) -> None:
 
 
 @router.message(Command("lang"))
-async def lang_menu(message: Message, state: FSMContext, db: Db) -> None:
+async def lang_menu(message: Message, state: FSMContext, db: Db, settings: Settings) -> None:
     await state.clear()
     user = await db.get_user(message.from_user.id)
-    buttons = [InlineKeyboardButton(text=texts.BTN_AUTO, callback_data="lang:auto")] + [
+    buttons = [InlineKeyboardButton(text=texts.BTN_AUTO, callback_data=f"lang:{AUTO}")] + [
         InlineKeyboardButton(text=name, callback_data=f"lang:{code}")
         for code, name in texts.LANG_NAMES.items()
     ]
     await message.answer(
-        texts.CHOOSE_LANG.format(current=lang_name(user.lang)),
+        texts.CHOOSE_LANG.format(current=lang_name(user.lang, settings.default_lang)),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[buttons[:3], buttons[3:]]),
     )
 
 
 @router.callback_query(F.data.startswith("lang:"))
-async def set_lang(query: CallbackQuery, db: Db) -> None:
+async def set_lang(query: CallbackQuery, db: Db, settings: Settings) -> None:
     code = query.data.split(":", 1)[1]
-    if code != "auto" and code not in texts.LANG_NAMES:
+    if code != AUTO and code not in texts.LANG_NAMES:
         return await query.answer()
-    lang = None if code == "auto" else code
-    await db.set_user(query.from_user.id, lang=lang)
-    await query.message.edit_text(texts.LANG_SET.format(name=lang_name(lang)))
+    await db.set_user(query.from_user.id, lang=code)
+    await query.message.edit_text(
+        texts.LANG_SET.format(name=lang_name(code, settings.default_lang))
+    )
     await query.answer()
 
 
@@ -149,7 +162,7 @@ async def receive_video(
     user = await db.get_user(message.from_user.id)
     text = (message.caption or "").strip() or None
     job_id = await enqueue(message, db, worker, settings, user_id=user.id, text=text,
-                           style=user.style, lang=user.lang)
+                           style=user.style, lang=stt_lang(user.lang, settings.default_lang))
     if job_id is None:
         return
 

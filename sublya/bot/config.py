@@ -22,6 +22,8 @@ class Settings:
     daily_videos: int = 10
     stt_daily_minutes: float = 300
     stt_lag: float | None = None  # None: the default for the transcript's timing kind
+    # recognition language for users who never picked one; None means autodetect
+    default_lang: str | None = "ru"
     max_duration: int = 180
     max_size: int = 200 * MB
     job_ttl: int = 24 * 3600
@@ -44,6 +46,7 @@ class Settings:
             daily_videos=int(env.get("DAILY_VIDEOS", 10)),
             stt_daily_minutes=float(env.get("STT_DAILY_MINUTES", 300)),
             stt_lag=float(env["STT_LAG"]) if env.get("STT_LAG") else None,
+            default_lang=env.get("DEFAULT_LANG", "ru") or None,
             stt=stt,
         )
 

@@ -69,6 +69,7 @@ Everything comes from the environment; `.env.example` lists it.
 | `STT_API_URL` | `https://openrouter.ai/api/v1` | any OpenAI-compatible base URL, e.g. Groq |
 | `STT_MODEL` | `openai/whisper-large-v3-turbo` | a Whisper model that returns word timestamps |
 | `STT_LAG` | tuned per timing kind | how late the recogniser places word starts, seconds |
+| `DEFAULT_LANG` | `ru` | speech language for users who never ran `/lang`; empty for autodetect, which can take Russian for English |
 | `STT_DAILY_MINUTES` | `300` | recognised minutes per day for the whole bot |
 | `DAILY_VIDEOS` | `10` | new videos per user per day; re-renders are free |
 | `ADMIN_IDS` | empty | Telegram user ids that get errors and `/stats` |
