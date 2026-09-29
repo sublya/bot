@@ -41,6 +41,5 @@ curl -x socks5h://127.0.0.1:1080 -sS -o /dev/null -w '%{http_code}\n' https://ap
   data/                # SQLite and job files; jobs are removed after 24 hours
 ```
 
-The site lives in `/opt/sublya/site`, see its repository. Ports 80 and 443 belong to the Caddy
-of the skator project on the same server: its `deploy/Caddyfile` has the
-`sublya.aimuzov.online` block, and the site container joins the `skator_default` network.
+The bot needs no open ports: it polls Telegram through the local Bot API server. The site is
+on GitHub Pages, see [sublya/site](https://github.com/sublya/site).
