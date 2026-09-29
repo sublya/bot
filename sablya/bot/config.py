@@ -21,7 +21,7 @@ class Settings:
     admin_ids: frozenset[int] = frozenset()
     daily_videos: int = 10
     stt_daily_minutes: float = 300
-    stt_lag: float = 0.0
+    stt_lag: float | None = None  # None: the default for the transcript's timing kind
     max_duration: int = 180
     max_size: int = 200 * MB
     job_ttl: int = 24 * 3600
@@ -43,7 +43,7 @@ class Settings:
             admin_ids=_ids(env.get("ADMIN_IDS", "")),
             daily_videos=int(env.get("DAILY_VIDEOS", 10)),
             stt_daily_minutes=float(env.get("STT_DAILY_MINUTES", 300)),
-            stt_lag=float(env.get("STT_LAG", 0)),
+            stt_lag=float(env["STT_LAG"]) if env.get("STT_LAG") else None,
             stt=stt,
         )
 

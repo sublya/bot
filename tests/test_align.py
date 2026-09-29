@@ -73,3 +73,21 @@ def test_paginate_respects_limits_and_lines(transcript, poem):
 def test_transcript_json_roundtrip(transcript):
     restored = Transcript.from_json(transcript.to_json())
     assert restored == transcript
+
+
+def test_api_timings_match_the_hand_checked_dtw_result(transcript, api_transcript, poem):
+    """Word spans from the API start early and swallow pauses; after snapping they should
+    land where the DTW pipeline put them, which was checked by eye frame by frame."""
+    reference = align(transcript, poem, lag=LAG)
+    words = align(api_transcript, poem)
+    assert [w.text for w in words] == [w.text for w in reference]
+    errors = sorted(abs(w.start - r.start) for w, r in zip(words, reference))
+    assert errors[len(errors) // 2] < 0.05, "median"
+    assert sum(errors) / len(errors) < 0.1, "mean"
+    assert errors[-1] < 0.5, "worst"
+
+
+def test_span_snap_keeps_starts_in_order(api_transcript):
+    words = align(api_transcript)
+    assert all(a.start <= b.start for a, b in zip(words, words[1:]))
+    assert all(w.end >= w.start for w in words)

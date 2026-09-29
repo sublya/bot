@@ -19,7 +19,14 @@ def transcript() -> Transcript:
         silences=[tuple(p) for p in meta["silences"]],
         size=(1080, 1920),
         duration=meta["duration"],
+        timing="mark",
     )
+
+
+@pytest.fixture
+def api_transcript() -> Transcript:
+    """The same video recognised by whisper-large-v3-turbo through OpenRouter."""
+    return Transcript.from_json((FIXTURE / "openrouter.json").read_text(encoding="utf-8"))
 
 
 @pytest.fixture

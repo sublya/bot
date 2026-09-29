@@ -21,6 +21,9 @@ class Transcript:
     silences: list[tuple[float, float]]
     size: tuple[int, int]
     duration: float
+    # "span": words come with start and end, as from the Whisper API;
+    # "mark": a single moment per word, as whisper.cpp DTW gives
+    timing: str = "span"
     lang: str | None = None
 
     @property
@@ -38,5 +41,6 @@ class Transcript:
             silences=[tuple(p) for p in d["silences"]],
             size=tuple(d["size"]),
             duration=d["duration"],
+            timing=d.get("timing", "span"),
             lang=d.get("lang"),
         )

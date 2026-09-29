@@ -11,17 +11,39 @@ PER_PAGE = 3
 MAX_CHARS = 24
 
 
-def snap(
-    words: list[Word], pauses: list[tuple[float, float]], duration: float, lag: float = 0.0
-) -> list[Word]:
-    """Recognisers mark a word a bit after it starts sounding. A pause that ends between two
+# how late each kind of timing places a word; negative means early
+DEFAULT_LAG = {"mark": 0.15, "span": -0.2}
+SPAN_LEAD = 0.2  # a pause starting this soon after a span's start still precedes the word
+SPAN_TRAIL = 0.3  # ...and may end this far past the span's end
+
+
+def snap_marks(words: list[Word], pauses: list[tuple[float, float]], lag: float) -> None:
+    """DTW marks a word a bit after it starts sounding. A pause that ends between two
     words' marks is exactly where the later word begins."""
-    out = [replace(w) for w in words]
     prev = 0.0
-    for w in out:
+    for w in words:
         resumed = [e for s, e in pauses if prev < e <= w.start]
         prev = w.start
         w.start = resumed[-1] if resumed else max(w.start - lag, 0)
+
+
+def snap_spans(words: list[Word], pauses: list[tuple[float, float]], lag: float) -> None:
+    """Whisper spans start early and swallow the pause before the word. A pause that covers
+    the span's start and ends inside it is where the word really begins."""
+    for w in words:
+        inside = [e for s, e in pauses if s < w.start + SPAN_LEAD and w.start < e < w.end + SPAN_TRAIL]
+        w.start = inside[-1] if inside else max(w.start - lag, 0)
+
+
+def snap(
+    words: list[Word], pauses: list[tuple[float, float]], duration: float,
+    lag: float | None = None, timing: str = "mark",
+) -> list[Word]:
+    out = [replace(w) for w in words]
+    lag = DEFAULT_LAG[timing] if lag is None else lag
+    (snap_marks if timing == "mark" else snap_spans)(out, pauses, lag)
+    for prev, w in zip(out, out[1:]):
+        w.start = max(w.start, prev.start)
     for i, w in enumerate(out):
         nxt = out[i + 1].start if i + 1 < len(out) else min(w.start + 2, duration)
         paused = [s for s, e in pauses if w.start < s < nxt]
@@ -96,7 +118,7 @@ def paginate(
     return pages
 
 
-def align(transcript: Transcript, text: str | None = None, lag: float = 0.0) -> list[Word]:
-    words = snap(transcript.words, transcript.silences, transcript.duration, lag)
+def align(transcript: Transcript, text: str | None = None, lag: float | None = None) -> list[Word]:
+    words = snap(transcript.words, transcript.silences, transcript.duration, lag, transcript.timing)
     ref = read_text(text) if text else []
     return apply_text(words, ref) if ref else words

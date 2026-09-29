@@ -28,8 +28,8 @@ def main() -> None:
     ap.add_argument("--text", type=Path, help="reference text; its line breaks become page breaks")
     ap.add_argument("--style", choices=STYLES, default=DEFAULT_STYLE)
     ap.add_argument("--lang", help="default: autodetect")
-    ap.add_argument("--lag", type=float, default=float(os.environ.get("STT_LAG", 0)),
-                    help="how late the recogniser marks words, seconds")
+    ap.add_argument("--lag", type=float, default=float(os.environ["STT_LAG"]) if os.environ.get("STT_LAG") else None,
+                    help="how late the recogniser places word starts, seconds; default depends on the timing kind")
     ap.add_argument("--retranscribe", action="store_true", help="ignore the cached transcript")
     args = ap.parse_args()
 
