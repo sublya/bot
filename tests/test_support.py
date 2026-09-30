@@ -191,3 +191,34 @@ async def test_groups_never_get_the_not_a_video_answer(bot, db):
     update = Update(update_id=1, message=in_group(bot, "что-то", chat=Chat(id=-999, type="group")))
     await dp.feed_update(bot, update, db=db, support=Support(bot, db, GROUP))
     assert bot.calls == []
+
+
+async def test_outgoing_middleware_passes_the_result_through(db):
+    from aiogram import Bot
+    from aiogram.client.session.base import BaseSession
+
+    from sublya.bot.support import MirrorOutgoing
+
+    sent = Message(message_id=5, date=datetime.now(), chat=Chat(id=ALICE.id, type="private"),
+                   text="Готово.")
+
+    class Session(BaseSession):
+        async def make_request(self, bot, method, timeout=None):
+            return sent
+
+        async def stream_content(self, *args, **kwargs):
+            raise NotImplementedError
+
+        async def close(self):
+            pass
+
+    mirrored = []
+
+    class Recorder(Support):
+        async def outgoing(self, user_id, message):
+            mirrored.append((user_id, message))
+
+    bot = Bot("1:token", session=Session())
+    bot.session.middleware(MirrorOutgoing(Recorder(bot, db, GROUP)))
+    assert await bot.send_message(ALICE.id, "Готово.") is sent
+    assert mirrored == [(ALICE.id, sent)]
