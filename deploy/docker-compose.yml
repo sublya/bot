@@ -20,6 +20,11 @@ services:
       LOGLEVEL: warn
     extra_hosts:
       - 'host.docker.internal:host-gateway'
+    # the skator Caddy reaches the bot's admin panel (port 8090) here; replies to it go out
+    # through the network's own route, not into the tunnel
+    networks:
+      - default
+      - skator
     logging: &logging
       driver: json-file
       options:
@@ -61,3 +66,8 @@ services:
 
 volumes:
   bot-api:
+
+networks:
+  skator:
+    name: skator_default
+    external: true

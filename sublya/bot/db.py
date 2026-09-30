@@ -4,7 +4,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import aiosqlite
@@ -87,6 +87,12 @@ class User:
     style: str
     lang: str | None
     created_at: float
+    name: str | None = None
+    username: str | None = None
+
+
+# columns added after the first release: CREATE TABLE IF NOT EXISTS won't add them
+MIGRATIONS = {"users": {"name": "TEXT", "username": "TEXT"}}
 
 
 class Db:
@@ -101,6 +107,12 @@ class Db:
         conn.row_factory = aiosqlite.Row
         await conn.execute("PRAGMA journal_mode=WAL")
         await conn.executescript(SCHEMA)
+        for table, columns in MIGRATIONS.items():
+            async with conn.execute(f"PRAGMA table_info({table})") as cur:
+                have = {row["name"] for row in await cur.fetchall()}
+            for column, kind in columns.items():
+                if column not in have:
+                    await conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
         return cls(conn, clock)
 
     async def close(self) -> None:
@@ -123,7 +135,7 @@ class Db:
     async def set_user(self, user_id: int, **fields: str | None) -> None:
         await self.get_user(user_id)
         for name, value in fields.items():
-            if name not in ("style", "lang"):
+            if name not in ("style", "lang", "name", "username"):
                 raise ValueError(name)
             await self.conn.execute(f"UPDATE users SET {name} = ? WHERE id = ?", (value, user_id))
 
@@ -232,6 +244,82 @@ class Db:
             "users_total": total["n"], "users_today": usage["users"], "videos_today": usage["videos"],
             "stt_minutes_today": round(usage["stt"] / 60, 1),
             "queued": jobs["queued"] or 0, "failed_today": jobs["failed"] or 0,
+        }
+
+    async def _all(self, sql: str, *args) -> list[dict]:
+        async with self.conn.execute(sql, args) as cur:
+            return [dict(row) for row in await cur.fetchall()]
+
+    async def dashboard(self, days: int = 14) -> dict:
+        """Everything the admin panel shows. A video is a job that received one, re-renders
+        are counted apart. Days are UTC, like the daily quotas."""
+        date = datetime.fromtimestamp(self.clock(), UTC).date()
+        today = date.isoformat()
+        week = (date - timedelta(days=6)).isoformat()
+        first = (date - timedelta(days=days - 1)).isoformat()
+        day_of = "date(created_at, 'unixepoch')"
+
+        users = await self._one(
+            f"SELECT COUNT(*) AS total, COALESCE(SUM({day_of} = ?), 0) AS today,"
+            f" COALESCE(SUM({day_of} >= ?), 0) AS week FROM users", today, week,
+        )
+        active = await self._one(
+            "SELECT COUNT(DISTINCT CASE WHEN day = ? THEN user_id END) AS today,"
+            " COUNT(DISTINCT user_id) AS week FROM usage WHERE videos > 0 AND day >= ?",
+            today, week,
+        )
+        videos = await self._one(
+            "SELECT COUNT(*) AS total, COALESCE(SUM(status = 'done'), 0) AS done,"
+            " COALESCE(SUM(status = 'failed'), 0) AS failed,"
+            f" COALESCE(SUM({day_of} = ?), 0) AS today, COALESCE(SUM({day_of} >= ?), 0) AS week"
+            " FROM jobs WHERE parent_id IS NULL", today, week,
+        )
+        rerenders = await self._one("SELECT COUNT(*) AS n FROM jobs WHERE parent_id IS NOT NULL")
+        stt = await self._one(
+            "SELECT COALESCE(SUM(stt_seconds), 0) AS total,"
+            " COALESCE(SUM(CASE WHEN day = ? THEN stt_seconds END), 0) AS today FROM usage", today,
+        )
+        queue = await self._one(
+            "SELECT COALESCE(SUM(status IN ('pending', 'queued')), 0) AS queued,"
+            " COALESCE(SUM(status = 'running'), 0) AS running FROM jobs"
+        )
+
+        by_day = {
+            (date - timedelta(days=i)).isoformat(): {"videos": 0, "done": 0, "failed": 0, "new_users": 0}
+            for i in range(days - 1, -1, -1)
+        }
+        for row in await self._all(
+            f"SELECT {day_of} AS day, COUNT(*) AS videos, SUM(status = 'done') AS done,"
+            f" SUM(status = 'failed') AS failed FROM jobs"
+            f" WHERE parent_id IS NULL AND {day_of} >= ? GROUP BY day", first,
+        ):
+            by_day[row.pop("day")].update(row)
+        for row in await self._all(
+            f"SELECT {day_of} AS day, COUNT(*) AS n FROM users WHERE {day_of} >= ? GROUP BY day",
+            first,
+        ):
+            by_day[row["day"]]["new_users"] = row["n"]
+
+        top = await self._all(
+            "SELECT u.id, u.name, u.username, COUNT(j.id) AS videos,"
+            " SUM(j.status = 'done') AS done, MAX(j.created_at) AS last"
+            " FROM users u JOIN jobs j ON j.user_id = u.id AND j.parent_id IS NULL"
+            " GROUP BY u.id ORDER BY videos DESC, last DESC LIMIT 10"
+        )
+        recent = await self._all(
+            "SELECT j.id, j.user_id, u.name, u.username, j.status, j.style,"
+            " j.parent_id IS NOT NULL AS rerender, j.created_at, j.finished_at,"
+            " substr(j.error, 1, 300) AS error"
+            " FROM jobs j LEFT JOIN users u ON u.id = j.user_id ORDER BY j.id DESC LIMIT 20"
+        )
+        return {
+            "users": {**dict(users), "active_today": active["today"], "active_week": active["week"]},
+            "videos": {**dict(videos), "rerenders": rerenders["n"]},
+            "stt_minutes": {"total": round(stt["total"] / 60, 1), "today": round(stt["today"] / 60, 1)},
+            "queue": dict(queue),
+            "days": [{"day": day, **row} for day, row in by_day.items()],
+            "top": top,
+            "recent": recent,
         }
 
     async def get_topic(self, user_id: int) -> int | None:

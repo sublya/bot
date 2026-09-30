@@ -73,6 +73,8 @@ Everything comes from the environment; `.env.example` lists it.
 | `STT_DAILY_MINUTES` | `300` | recognised minutes per day for the whole bot |
 | `DAILY_VIDEOS` | `10` | new videos per user per day; re-renders are free |
 | `ADMIN_IDS` | empty | Telegram user ids that get errors and `/stats` |
+| `ADMIN_URL` | empty | public address of the admin Mini App (users, videos, OpenRouter balance); `/admin` opens it for `ADMIN_IDS` |
+| `ADMIN_PORT` | `8090` | port of the admin panel's web server |
 | `SUPPORT_CHAT_ID` | empty | forum group with the bot as admin: each user's dialogue goes to its own topic, and replies there go to the user |
 | `TELEGRAM_API_URL` | empty | local Bot API server |
 | `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` | | from my.telegram.org, for the local Bot API server |

@@ -60,7 +60,10 @@ SUPPORT_NO_USER = "⚠️ Эта тема ни к кому не привязан
 SUPPORT_BLOCKED = "⚠️ Не доставлено: пользователь заблокировал бота."
 SUPPORT_FAILED = "⚠️ Не доставлено: {error}"
 
-ADMIN_ERROR ="Задача {job_id} (user {user_id}) упала: {error}"
+ADMIN_PANEL = "Пользователи, видео и баланс OpenRouter:"
+BTN_ADMIN = "Открыть админку"
+
+ADMIN_ERROR = "Задача {job_id} (user {user_id}) упала: {error}"
 STATS = """Сегодня:
 пользователей {users_today} (всего {users_total})
 видео {videos_today}
