@@ -40,12 +40,9 @@ def lang_name(chosen: str | None, default: str | None) -> str:
 
 
 @router.message(CommandStart())
-async def start(message: Message, state: FSMContext, settings: Settings) -> None:
+async def start(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(texts.START.format(
-        minutes=settings.max_duration // 60, mb=settings.download_limit // MB,
-        daily=settings.daily_videos,
-    ))
+    await message.answer(texts.START)
 
 
 @router.message(Command("cancel"))
