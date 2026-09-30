@@ -10,6 +10,8 @@ from aiogram.types import BotCommand
 from .config import Settings
 from .db import Db
 from .handlers import router
+from .support import MirrorOutgoing, Support, mirror_incoming
+from .support import router as support_router
 from .worker import Worker, cleanup_loop
 
 COMMANDS = [
@@ -32,15 +34,21 @@ async def run() -> None:
     bot = Bot(settings.bot_token, session=session)
     db = await Db.open(settings.data_dir / "sublya.db")
     worker = Worker(bot, db, settings)
+    support = Support(bot, db, settings.support_chat_id)
     dp = Dispatcher(storage=MemoryStorage())
+    dp.include_router(support_router)
     dp.include_router(router)
+    if settings.support_chat_id is not None:
+        bot.session.middleware(MirrorOutgoing(support))
+        router.message.outer_middleware(mirror_incoming)
+        router.callback_query.outer_middleware(mirror_incoming)
 
     await bot.set_my_commands(COMMANDS)
     tasks = [asyncio.create_task(worker.run()), asyncio.create_task(cleanup_loop(settings))]
     for task in tasks:
         task.add_done_callback(crashed)
     try:
-        await dp.start_polling(bot, db=db, worker=worker, settings=settings)
+        await dp.start_polling(bot, db=db, worker=worker, settings=settings, support=support)
     finally:
         for task in tasks:
             task.cancel()

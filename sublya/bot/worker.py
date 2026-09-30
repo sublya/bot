@@ -17,6 +17,7 @@ from sublya.core.ffmpeg import FFmpegError
 from . import texts
 from .config import Settings
 from .db import Db, Job
+from .support import quiet
 
 log = logging.getLogger(__name__)
 
@@ -126,7 +127,8 @@ class Worker:
     async def notify_admins(self, text: str) -> None:
         for admin in self.settings.admin_ids:
             try:
-                await self.bot.send_message(admin, text[-4000:])
+                with quiet():
+                    await self.bot.send_message(admin, text[-4000:])
             except Exception:
                 log.exception("could not notify admin %d", admin)
 

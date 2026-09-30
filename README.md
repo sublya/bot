@@ -73,6 +73,7 @@ Everything comes from the environment; `.env.example` lists it.
 | `STT_DAILY_MINUTES` | `300` | recognised minutes per day for the whole bot |
 | `DAILY_VIDEOS` | `10` | new videos per user per day; re-renders are free |
 | `ADMIN_IDS` | empty | Telegram user ids that get errors and `/stats` |
+| `SUPPORT_CHAT_ID` | empty | forum group with the bot as admin: each user's dialogue goes to its own topic, and replies there go to the user |
 | `TELEGRAM_API_URL` | empty | local Bot API server |
 | `TELEGRAM_API_ID`, `TELEGRAM_API_HASH` | | from my.telegram.org, for the local Bot API server |
 | `DATA_DIR` | `data` | SQLite database and job files, removed after 24 hours |

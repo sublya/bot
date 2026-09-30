@@ -13,10 +13,13 @@ from sublya.core import STYLES, Transcript
 from . import texts
 from .config import MB, Settings
 from .db import Busy, Db, Job, QuotaExceeded
+from .support import quiet
 from .worker import Worker, job_dir, result_keyboard
 
 log = logging.getLogger(__name__)
 router = Router()
+# groups belong to support.router; here the fallback would answer every message there
+router.message.filter(F.chat.type == "private")
 
 
 class FixText(StatesGroup):
@@ -124,7 +127,9 @@ async def enqueue(
     except QuotaExceeded:
         await message.answer(texts.QUOTA.format(daily=settings.daily_videos))
         return None
-    progress = await message.answer(texts.QUEUED.format(position=await db.position(job_id) or 1))
+    position = await db.position(job_id) or 1
+    with quiet():
+        progress = await message.answer(texts.QUEUED.format(position=position))
     await db.set_progress_msg(job_id, progress.message_id)
     worker.wake.set()
     return job_id
