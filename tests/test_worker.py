@@ -2,10 +2,11 @@ import os
 from pathlib import Path
 
 import pytest
+from aiogram.exceptions import TelegramBadRequest
 
 from sublya.bot import texts
 from sublya.bot.config import Settings
-from sublya.bot.db import Db
+from sublya.bot.db import Db, Job
 from sublya.bot.worker import Worker, cleanup
 from sublya.core.ffmpeg import has_filter, run, tool
 from sublya.core.transcribe import SttConfig
@@ -14,9 +15,15 @@ from sublya.core.transcribe import SttConfig
 class FakeBot:
     def __init__(self) -> None:
         self.sent: list[tuple[str, int, object]] = []
+        self.notes_forbidden = False
 
     async def send_video(self, chat_id, video, **kw):
         self.sent.append(("video", chat_id, Path(video.path).stat().st_size))
+
+    async def send_video_note(self, chat_id, video_note, **kw):
+        if self.notes_forbidden:
+            raise TelegramBadRequest(method=None, message="VOICE_MESSAGES_FORBIDDEN")
+        self.sent.append(("video_note", chat_id, kw["length"]))
 
     async def send_message(self, chat_id, text, **kw):
         self.sent.append(("message", chat_id, text))
@@ -77,6 +84,30 @@ async def test_rerender_uses_cached_transcript(env, transcript, poem):
     assert [kind for kind, _, _ in bot.sent] == ["edit", "video", "delete"]
     assert await db.stt_seconds_today() == 0, "a re-render must not call STT"
     assert not list(work.glob("out-*.mp4")), "the rendered file is removed after sending"
+
+
+async def note_job(db: Db, parent_id: int | None = None) -> Job:
+    job = await db.submit(user_id=1, chat_id=1, input_path="in.mp4", text=None, style="classic",
+                          lang=None, parent_id=parent_id, daily_limit=10, note=True)
+    return await db.get_job(job)
+
+
+async def test_video_note_goes_back_as_video_note(env, tmp_path, transcript):
+    _, db, bot, worker = env
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"x")
+    transcript.size = (384, 384)
+    await worker.send(await note_job(db), out, transcript)
+    assert bot.sent == [("video_note", 1, 384)]
+
+
+async def test_forbidden_video_note_falls_back_to_video(env, tmp_path, transcript):
+    _, db, bot, worker = env
+    bot.notes_forbidden = True
+    out = tmp_path / "out.mp4"
+    out.write_bytes(b"x")
+    await worker.send(await note_job(db), out, transcript)
+    assert [kind for kind, _, _ in bot.sent] == ["video"]
 
 
 def test_cleanup_removes_only_stale_job_dirs(tmp_path):

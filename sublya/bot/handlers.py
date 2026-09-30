@@ -127,14 +127,17 @@ async def admin(message: Message, settings: Settings) -> None:
 async def enqueue(
     message: Message, db: Db, worker: Worker, settings: Settings, *, user_id: int,
     text: str | None, style: str, lang: str | None, parent: Job | None = None,
+    note: bool = False,
 ) -> int | None:
-    """Queues a job and posts the progress message the worker will keep editing."""
+    """Queues a job and posts the progress message the worker will keep editing.
+    Re-renders keep the parent's shape: a video note comes back as a video note."""
     try:
         job_id = await db.submit(
             user_id=user_id, chat_id=message.chat.id,
             input_path=parent.input_path if parent else None,
             text=text, style=style, lang=lang,
             parent_id=parent.root_id if parent else None, daily_limit=settings.daily_videos,
+            note=bool(parent.note) if parent else note,
         )
     except Busy:
         await message.answer(texts.BUSY)
@@ -182,7 +185,8 @@ async def receive_video(
                       username=message.from_user.username)
     text = (message.caption or "").strip() or None
     job_id = await enqueue(message, db, worker, settings, user_id=user.id, text=text,
-                           style=user.style, lang=stt_lang(user.lang, settings.default_lang))
+                           style=user.style, lang=stt_lang(user.lang, settings.default_lang),
+                           note=message.video_note is not None)
     if job_id is None:
         return
 
