@@ -185,16 +185,17 @@ class MirrorOutgoing(BaseRequestMiddleware):
         make_request: NextRequestMiddlewareType[TelegramType],
         bot: Bot,
         method: TelegramMethod[TelegramType],
-    ) -> Response[TelegramType]:
-        response = await make_request(bot, method)
+    ) -> TelegramType:
+        # despite the annotation in aiogram, the chain hands back the result, not a Response
+        result = await make_request(bot, method)
         if (
             isinstance(method, SendMessage | SendVideo)
             and isinstance(method.chat_id, int) and method.chat_id > 0
-            and isinstance(response.result, Message)
+            and isinstance(result, Message)
             and not _quiet.get()
         ):
-            await self.support.outgoing(method.chat_id, response.result)
-        return response
+            await self.support.outgoing(method.chat_id, result)
+        return result
 
 
 async def mirror_incoming(
