@@ -6,7 +6,13 @@ from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandStart, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    WebAppInfo,
+)
 
 from sublya.core import STYLES, Transcript
 
@@ -109,6 +115,15 @@ async def stats(message: Message, db: Db, settings: Settings) -> None:
     await message.answer(texts.STATS.format(**await db.stats(), stt_limit=settings.stt_daily_minutes))
 
 
+@router.message(Command("admin"))
+async def admin(message: Message, settings: Settings) -> None:
+    if message.from_user.id not in settings.admin_ids or not settings.admin_url:
+        return
+    button = InlineKeyboardButton(text=texts.BTN_ADMIN, web_app=WebAppInfo(url=settings.admin_url))
+    await message.answer(texts.ADMIN_PANEL,
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[button]]))
+
+
 async def enqueue(
     message: Message, db: Db, worker: Worker, settings: Settings, *, user_id: int,
     text: str | None, style: str, lang: str | None, parent: Job | None = None,
@@ -162,6 +177,9 @@ async def receive_video(
         return
 
     user = await db.get_user(message.from_user.id)
+    # names are only for the admin panel, so they are refreshed when a video comes
+    await db.set_user(user.id, name=message.from_user.full_name,
+                      username=message.from_user.username)
     text = (message.caption or "").strip() or None
     job_id = await enqueue(message, db, worker, settings, user_id=user.id, text=text,
                            style=user.style, lang=stt_lang(user.lang, settings.default_lang))

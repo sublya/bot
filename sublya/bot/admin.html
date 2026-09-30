@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Сабля: админка</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-secondary-bg-color, #f1f1f4);
+    --card: var(--tg-theme-section-bg-color, var(--tg-theme-bg-color, #fff));
+    --text: var(--tg-theme-text-color, #111);
+    --muted: var(--tg-theme-hint-color, #8a8a8e);
+    --accent: var(--tg-theme-button-color, #2481cc);
+    --accent-text: var(--tg-theme-button-text-color, #fff);
+    --line: color-mix(in srgb, var(--muted) 22%, transparent);
+    --good: #1f9d55;
+    --warn: #c27c0e;
+    --bad: var(--tg-theme-destructive-text-color, #d93025);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.tg) {
+      --bg: #0f0f10; --card: #1c1c1e; --text: #f2f2f2; --muted: #8e8e93; --accent: #3e9bf0;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 12px 16px 32px; }
+  header { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 12px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+       color: var(--muted); margin: 20px 4px 8px; }
+  .updated { color: var(--muted); font-size: 13px; }
+  button {
+    font: inherit; border: 0; border-radius: 10px; padding: 7px 12px; cursor: pointer;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
+  }
+  button:disabled { opacity: .5; }
+  .card { background: var(--card); border-radius: 14px; padding: 14px 16px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .label { color: var(--muted); font-size: 13px; }
+  .value { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 2px 0; }
+  .hero .value { font-size: 36px; }
+  .sub { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .meter { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
+  .meter > div { height: 100%; background: var(--accent); border-radius: 3px; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: 160px; overflow: visible; }
+  .chart .bar { fill: var(--accent); }
+  .chart .bar.dim { opacity: .35; }
+  .chart .axis { fill: var(--muted); font-size: 11px; }
+  .chart .grid-line { stroke: var(--line); stroke-width: 1; }
+  .tip {
+    position: absolute; pointer-events: none; background: var(--text); color: var(--card);
+    border-radius: 8px; padding: 6px 9px; font-size: 12px; white-space: nowrap;
+    transform: translate(-50%, calc(-100% - 8px)); display: none;
+  }
+  .list { padding: 0; }
+  .row { display: flex; gap: 10px; align-items: baseline; padding: 11px 16px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .err { color: var(--bad); font-size: 12px; margin-top: 3px; word-break: break-word; }
+  .status { font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .status::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+                    background: currentColor; margin-right: 5px; vertical-align: 1px; }
+  .done { color: var(--good); } .failed { color: var(--bad); }
+  .queued, .pending, .running { color: var(--warn); }
+  .empty, .message { color: var(--muted); padding: 16px; text-align: center; }
+  @media (max-width: 380px) { .value { font-size: 22px; } .hero .value { font-size: 30px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Сабля</h1>
+      <div class="updated" id="updated">загружаю…</div>
+    </div>
+    <button id="refresh" type="button">Обновить</button>
+  </header>
+  <div id="app"></div>
+</main>
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg?.initData) {
+  document.documentElement.classList.add("tg");
+  tg.ready();
+  tg.expand();
+}
+
+const STATUS = { done: "готово", failed: "ошибка", queued: "в очереди", pending: "скачивается", running: "в работе" };
+const STYLE = { classic: "Классика", big: "Крупно", box: "Плашка", single: "По слову" };
+const nf = new Intl.NumberFormat("ru-RU");
+// cents are too coarse for a day of Whisper: it costs fractions of a cent
+const usd = (v) => v == null ? "—" : "$" + Number(v).toFixed(v > 0 && v < 0.1 ? 4 : 2);
+const when = (ts) => new Date(ts * 1000).toLocaleString("ru-RU",
+  { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("ru-RU",
+  { day: "numeric", month: "short", timeZone: "UTC" });
+const shortDay = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("ru-RU",
+  { day: "numeric", month: "numeric", timeZone: "UTC" });
+const who = (u) => u.name || (u.username ? "@" + u.username : "id " + (u.id ?? u.user_id));
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v; else node.setAttribute(k, v);
+  }
+  for (const child of children.flat()) {
+    if (child != null) node.append(child instanceof Node ? child : String(child));
+  }
+  return node;
+}
+
+function tile(label, value, sub, extra) {
+  return el("div", { class: "card" }, el("div", { class: "label" }, label),
+    el("div", { class: "value" }, value), sub && el("div", { class: "sub" }, sub), extra);
+}
+
+function chart(days, W) {
+  const H = 160, top = 8, bottom = 22, left = 26;
+  const max = Math.max(1, ...days.map((d) => d.videos));
+  const step = Math.max(1, Math.ceil(max / 3));
+  const ceil = step * Math.ceil(max / step);
+  const y = (v) => top + (H - top - bottom) * (1 - v / ceil);
+  const slot = (W - left) / days.length;
+  const barW = Math.max(4, slot - 2);  // 2px gap between neighbours
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Видео по дням");
+  const add = (name, attrs, text) => {
+    const n = document.createElementNS(ns, name);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (text != null) n.textContent = text;
+    svg.append(n);
+    return n;
+  };
+  for (let v = 0; v <= ceil; v += step) {
+    add("line", { class: "grid-line", x1: left, x2: W, y1: y(v), y2: y(v) });
+    add("text", { class: "axis", x: left - 6, y: y(v) + 4, "text-anchor": "end" }, v);
+  }
+  const bars = days.map((d, i) => {
+    const x = left + i * slot + (slot - barW) / 2;
+    const h = Math.max(0, y(0) - y(d.videos));
+    // flat bottom on the baseline, 4px rounding on the data end only
+    const r = Math.min(4, barW / 2, h);
+    const path = h ? `M${x},${y(0)} v${-(h - r)} q0,${-r} ${r},${-r} h${barW - 2 * r}` +
+      ` q${r},0 ${r},${r} v${h - r} z` : "";
+    const bar = add("path", { class: "bar", d: path });
+    // a label needs about 44px; the last day is always signed, its neighbours give way
+    const every = Math.ceil(days.length / Math.max(1, Math.floor((W - left) / 44)));
+    const fromEnd = days.length - 1 - i;
+    if (fromEnd % every === 0) {
+      add("text", { class: "axis", x: x + barW / 2, y: H - 6, "text-anchor": "middle" }, shortDay(d.day));
+    }
+    return bar;
+  });
+
+  const tip = el("div", { class: "tip" });
+  const box = el("div", { class: "card chart" }, svg, tip);
+  const show = (evt) => {
+    const rect = svg.getBoundingClientRect();
+    const i = Math.min(days.length - 1, Math.max(0,
+      Math.floor(((evt.clientX - rect.left) / rect.width * W - left) / slot)));
+    const d = days[i];
+    bars.forEach((b, j) => b.classList.toggle("dim", j !== i));
+    tip.textContent = "";
+    tip.append(el("b", {}, dayLabel(d.day)), el("br"),
+      `видео ${d.videos}, готово ${d.done}, ошибок ${d.failed}`, el("br"),
+      `новых пользователей ${d.new_users}`);
+    const cx = (left + (i + .5) * slot) / W * rect.width;
+    tip.style.left = Math.min(rect.width - 90, Math.max(90, cx)) + 16 + "px";
+    tip.style.top = (y(d.videos) / H * rect.height + 14) + "px";
+    tip.style.display = "block";
+  };
+  const hide = () => { tip.style.display = "none"; bars.forEach((b) => b.classList.remove("dim")); };
+  svg.addEventListener("pointermove", show);
+  svg.addEventListener("pointerdown", show);
+  svg.addEventListener("pointerleave", hide);
+  return box;
+}
+
+function render(data) {
+  const app = document.getElementById("app");
+  const or = data.openrouter;
+  const u = data.users, v = data.videos, stt = data.stt_minutes;
+  const sttShare = Math.min(100, stt.today / data.stt_limit * 100);
+
+  const hero = el("div", { class: "card hero" },
+    el("div", { class: "label" }, "Баланс OpenRouter"),
+    el("div", { class: "value" }, or ? usd(or.balance) : "—"),
+    el("div", { class: "sub" }, or
+      ? `потрачено: сегодня ${usd(or.usage_daily)}, неделя ${usd(or.usage_weekly)}, месяц ${usd(or.usage_monthly)}`
+      : "OpenRouter не ответил"),
+    or && el("div", { class: "sub" }, `пополнено ${usd(or.credits)}, потрачено всего ${usd(or.usage)}`));
+
+  const tiles = el("div", { class: "grid" },
+    tile("Пользователи", nf.format(u.total), `+${u.today} сегодня, +${u.week} за неделю`),
+    tile("Активны", nf.format(u.active_week), `за неделю, сегодня ${u.active_today}`),
+    tile("Видео готово", nf.format(v.done), `сегодня ${v.today}, за неделю ${v.week}`),
+    tile("Ошибки", nf.format(v.failed), `из ${nf.format(v.total)}, перерендеров ${nf.format(v.rerenders)}`),
+    tile("Распознано сегодня", `${stt.today} мин`, `из ${data.stt_limit}, всего ${nf.format(stt.total)} мин`,
+      el("div", { class: "meter" }, el("div", { style: `width:${sttShare}%` }))),
+    tile("Очередь", nf.format(data.queue.queued + data.queue.running),
+      data.queue.running ? "одно видео в работе" : "никто не ждёт"));
+
+  const top = el("div", { class: "card list" }, data.top.length ? data.top.map((t) =>
+    el("div", { class: "row" },
+      el("div", { class: "main" },
+        el("div", { class: "name" }, who(t)),
+        el("div", { class: "sub" }, `${t.username ? "@" + t.username + ", " : ""}последнее ${when(t.last)}`)),
+      el("div", { class: "num" }, `${t.done} / ${t.videos}`))) : el("div", { class: "empty" }, "Пока никого"));
+
+  const recent = el("div", { class: "card list" }, data.recent.length ? data.recent.map((j) => {
+    const took = j.finished_at ? Math.round(j.finished_at - j.created_at) + " с" : "";
+    return el("div", { class: "row" },
+      el("div", { class: "main" },
+        el("div", { class: "name" }, `#${j.id} ${who(j)}`),
+        el("div", { class: "sub" }, [when(j.created_at), STYLE[j.style] || j.style,
+          j.rerender ? "перерендер" : null, took].filter(Boolean).join(", ")),
+        j.error && el("div", { class: "err" }, j.error)),
+      el("div", { class: `status ${j.status}` }, STATUS[j.status] || j.status));
+  }) : el("div", { class: "empty" }, "Задач ещё не было"));
+
+  app.replaceChildren(hero, el("h2", {}, "Сводка"), tiles,
+    el("h2", {}, `Видео по дням, ${data.days.length} дней (UTC)`), chart(data.days, app.clientWidth - 32),
+    el("h2", {}, "Самые активные: готово / всего"), top,
+    el("h2", {}, "Последние задачи"), recent);
+}
+
+async function load() {
+  const button = document.getElementById("refresh");
+  const updated = document.getElementById("updated");
+  const app = document.getElementById("app");
+  button.disabled = true;
+  try {
+    const res = await fetch("/admin/api/stats", {
+      headers: { Authorization: "tma " + (tg?.initData || "") },
+    });
+    if (res.status === 401) throw new Error("Открой админку кнопкой в боте: без подписи Telegram данные не отдаются.");
+    if (res.status === 403) throw new Error("У этого аккаунта нет доступа к админке.");
+    if (!res.ok) throw new Error(`Сервер ответил ${res.status}.`);
+    last = await res.json();
+    render(last);
+    updated.textContent = "обновлено в " + new Date().toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  } catch (e) {
+    app.replaceChildren(el("div", { class: "card message" }, e.message || "Не получилось загрузить данные."));
+    updated.textContent = "ошибка";
+    tg?.HapticFeedback?.notificationOccurred("error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+let last = null;
+let resized = 0;
+window.addEventListener("resize", () => {
+  clearTimeout(resized);
+  resized = setTimeout(() => last && render(last), 150);
+});
+document.getElementById("refresh").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>

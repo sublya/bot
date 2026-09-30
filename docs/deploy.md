@@ -41,5 +41,10 @@ curl -x socks5h://127.0.0.1:1080 -sS -o /dev/null -w '%{http_code}\n' https://ap
   data/                # SQLite and job files; jobs are removed after 24 hours
 ```
 
-The bot needs no open ports: it polls Telegram through the local Bot API server. The site is
-on GitHub Pages, see [sublya/site](https://github.com/sublya/site).
+The bot needs no open ports: it polls Telegram through the local Bot API server. The only way
+in is the admin Mini App: `tunnel` also joins the skator project's `skator_default` network,
+and the skator Caddy proxies `https://sublya.aimuzov.online/admin` to `sublya-tunnel:8090`.
+That block lives in the skator repository's Caddyfile. Set `ADMIN_URL` to that address in the
+server's `.env`.
+
+The site is served next to it, see [sublya/site](https://github.com/sublya/site).
