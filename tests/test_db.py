@@ -1,3 +1,4 @@
+import aiosqlite
 import pytest
 
 from sublya.bot.db import Busy, Db, QuotaExceeded
@@ -139,3 +140,30 @@ async def test_restart_fails_pending_jobs(db):
                           lang=None, parent_id=None, daily_limit=10)
     await db.requeue_running()
     assert (await db.get_job(job)).status == "failed"
+
+
+async def test_note_flag_is_stored(db):
+    job = await db.submit(user_id=1, chat_id=1, input_path="in.mp4", text=None, style="classic",
+                          lang=None, parent_id=None, daily_limit=10, note=True)
+    assert (await db.get_job(job)).note
+    await db.finish(job, "done")
+    assert not (await db.get_job(await submit(db, 2))).note
+
+
+async def test_migration_adds_note_to_old_jobs(tmp_path):
+    path = tmp_path / "old.db"
+    async with aiosqlite.connect(path) as conn:
+        await conn.execute(
+            "CREATE TABLE jobs (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL,"
+            " chat_id INTEGER NOT NULL, parent_id INTEGER, status TEXT NOT NULL, input_path TEXT,"
+            " text TEXT, style TEXT NOT NULL, lang TEXT, progress_msg_id INTEGER, error TEXT,"
+            " created_at REAL NOT NULL, finished_at REAL)"
+        )
+        await conn.execute("INSERT INTO jobs (user_id, chat_id, status, style, created_at)"
+                           " VALUES (1, 1, 'done', 'classic', 0)")
+        await conn.commit()
+    db = await Db.open(path)
+    try:
+        assert (await db.get_job(1)).note == 0
+    finally:
+        await db.close()

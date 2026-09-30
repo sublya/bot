@@ -27,6 +27,8 @@ def main() -> None:
     ap.add_argument("-o", "--output", type=Path, help="default: <video>.subs.mp4")
     ap.add_argument("--text", type=Path, help="reference text; its line breaks become page breaks")
     ap.add_argument("--style", choices=STYLES, default=DEFAULT_STYLE)
+    ap.add_argument("--circle", action="store_true",
+                    help="keep subtitles inside the circle a Telegram video note is cropped to")
     ap.add_argument("--lang", default=os.environ.get("DEFAULT_LANG", "ru") or "auto",
                     help="speech language, or auto; default: DEFAULT_LANG or ru")
     ap.add_argument("--lag", type=float, default=float(os.environ["STT_LAG"]) if os.environ.get("STT_LAG") else None,
@@ -56,7 +58,7 @@ def main() -> None:
         "".join(f"{w.start:.2f}\t{w.end:.2f}\t{w.text}\n" for w in words), encoding="utf-8"
     )
     print("text:", " ".join(w.text for w in words), file=sys.stderr)
-    shutil.move(render(video, words, transcript.size, work, args.style), out)
+    shutil.move(render(video, words, transcript.size, work, args.style, args.circle), out)
     print(out)
 
 

@@ -1,7 +1,7 @@
 """ASS subtitles with one event per word, and burning them into the video."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .align import MAX_CHARS, PER_PAGE, paginate
@@ -29,6 +29,7 @@ class Preset:
     max_chars: int = MAX_CHARS
     hi_colour: str = YELLOW
     box: bool = False
+    side: float = 0.08  # left and right margins as a share of frame width
 
 
 PRESETS = {
@@ -37,6 +38,19 @@ PRESETS = {
     "box": Preset(font=0.065, margin=0.14, hi_colour=WHITE, box=True),
     "single": Preset(font=0.12, margin=0, alignment=5, per_page=1, hi_colour=WHITE),
 }
+
+CIRCLE_MARGIN = 0.2  # the circle's chord 0.3h below the centre is still 0.8w wide
+CIRCLE_SIDE = 0.12
+CAPS_WIDTH = 0.7  # average width of an upper-case Montserrat ExtraBold letter, in font sizes
+
+
+def for_circle(p: Preset) -> Preset:
+    """A video note is shown cropped to its inscribed circle, so the corners are gone: bottom
+    lines move up to where the circle is still wide, and pages get fewer letters."""
+    font = min(p.font, 0.09)
+    fits = int((1 - 2 * CIRCLE_SIDE) / (CAPS_WIDTH * font))
+    margin = max(p.margin, CIRCLE_MARGIN) if p.alignment == 2 else p.margin
+    return replace(p, font=font, margin=margin, side=CIRCLE_SIDE, max_chars=min(p.max_chars, fits))
 
 
 def ass_time(t: float) -> str:
@@ -59,12 +73,14 @@ def style_line(name: str, p: Preset, size: tuple[int, int], colour: str, box: bo
     return (
         f"Style: {name},{FONT},{fs},{colour},{colour},{outline_colour},{SHADOW},-1,0,0,0,"
         f"100,100,0,0,{border},{outline},{shadow},{p.alignment},"
-        f"{round(w * 0.08)},{round(w * 0.08)},{round(h * p.margin)},1"
+        f"{round(w * p.side)},{round(w * p.side)},{round(h * p.margin)},1"
     )
 
 
-def write_ass(words: list[Word], size: tuple[int, int], style: str, path: Path) -> None:
-    p = PRESETS[style]
+def write_ass(
+    words: list[Word], size: tuple[int, int], style: str, path: Path, circle: bool = False
+) -> None:
+    p = for_circle(PRESETS[style]) if circle else PRESETS[style]
     w, h = size
     header = f"""[Script Info]
 ScriptType: v4.00+
@@ -86,13 +102,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     for n, page in enumerate(pages):
         next_page_start = pages[n + 1][0].start if n + 1 < len(pages) else float("inf")
         texts = [ass_escape(x.text.upper()) for x in page]
+        # a word longer than a page can't wrap and would stick out of the circle, so it is
+        # squeezed; \r drops the squeeze, hence it goes after every reset too
+        length = len(" ".join(texts))
+        fit = rf"{{\fscx{100 * p.max_chars // length}}}" if circle and length > p.max_chars else ""
         for i, word in enumerate(page):
             # each word stays lit until the next one starts, so the page never blinks
             if i + 1 < len(page):
                 end = page[i + 1].start
             else:
                 end = min(word.end + TAIL, next_page_start)
-            body = " ".join(f"{HIGHLIGHT}{t}{{\\r}}" if j == i else t for j, t in enumerate(texts))
+            body = fit + " ".join(
+                f"{HIGHLIGHT}{fit}{t}{{\\r}}{fit}" if j == i else t for j, t in enumerate(texts)
+            )
             pop = r"{\fad(80,0)}" if i == 0 else ""
             lines.append(
                 f"Dialogue: 0,{ass_time(word.start)},{ass_time(end)},Word,,0,0,0,,{pop}{body}"
@@ -116,10 +138,10 @@ def burn(video: Path, ass: Path, out: Path, extra: list[str] | None = None) -> N
 
 def render(
     video: Path, words: list[Word], size: tuple[int, int], workdir: Path,
-    style: str = DEFAULT_STYLE,
+    style: str = DEFAULT_STYLE, circle: bool = False,
 ) -> Path:
     ass = workdir / "subs.ass"
     out = workdir / f"out-{style}.mp4"
-    write_ass(words, size, style, ass)
+    write_ass(words, size, style, ass, circle)
     burn(video, ass, out)
     return out

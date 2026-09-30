@@ -74,6 +74,7 @@ class Job:
     error: str | None
     created_at: float
     finished_at: float | None
+    note: int = 0  # the video came as a video note, so the result goes back as one
 
     @property
     def root_id(self) -> int:
@@ -92,7 +93,10 @@ class User:
 
 
 # columns added after the first release: CREATE TABLE IF NOT EXISTS won't add them
-MIGRATIONS = {"users": {"name": "TEXT", "username": "TEXT"}}
+MIGRATIONS = {
+    "users": {"name": "TEXT", "username": "TEXT"},
+    "jobs": {"note": "INTEGER NOT NULL DEFAULT 0"},
+}
 
 
 class Db:
@@ -151,7 +155,7 @@ class Db:
 
     async def submit(
         self, *, user_id: int, chat_id: int, input_path: str | None, text: str | None, style: str,
-        lang: str | None, parent_id: int | None, daily_limit: int,
+        lang: str | None, parent_id: int | None, daily_limit: int, note: bool = False,
     ) -> int:
         """Queues a job. Re-renders (with parent_id) don't count against the daily quota.
         Without input_path the job stays pending until ready(), so the worker never sees a
@@ -172,8 +176,8 @@ class Db:
                 )
             cur = await self.conn.execute(
                 "INSERT INTO jobs (user_id, chat_id, parent_id, status, input_path, text, style,"
-                " lang, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (user_id, chat_id, parent_id, "queued" if input_path else "pending", input_path, text, style, lang, self.clock()),
+                " lang, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, chat_id, parent_id, "queued" if input_path else "pending", input_path, text, style, lang, note, self.clock()),
             )
             return cur.lastrowid
 

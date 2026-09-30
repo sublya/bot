@@ -99,18 +99,34 @@ class Worker:
 
         await self.progress(job, texts.RENDERING)
         words = align(transcript, job.text, self.settings.stt_lag)
-        out = await asyncio.to_thread(render, video, words, transcript.size, work, job.style)
+        out = await asyncio.to_thread(
+            render, video, words, transcript.size, work, job.style, bool(job.note)
+        )
         try:
-            w, h = transcript.size
-            await self.bot.send_video(
-                job.chat_id, FSInputFile(out, filename="sublya.mp4"),
-                width=w, height=h, duration=round(transcript.duration),
-                supports_streaming=True, reply_markup=result_keyboard(job.id),
-            )
+            await self.send(job, out, transcript)
         finally:
             out.unlink(missing_ok=True)
         await self.db.finish(job.id, "done")
         await self.drop_progress(job)
+
+    async def send(self, job: Job, out: Path, transcript: Transcript) -> None:
+        w, h = transcript.size
+        duration = round(transcript.duration)
+        if job.note:
+            try:
+                await self.bot.send_video_note(
+                    job.chat_id, FSInputFile(out, filename="sublya.mp4"), length=w,
+                    duration=duration, reply_markup=result_keyboard(job.id),
+                )
+                return
+            except TelegramBadRequest:
+                # users who closed voice messages in privacy settings can't get video notes
+                log.warning("video note for job %d refused, sending a video", job.id)
+        await self.bot.send_video(
+            job.chat_id, FSInputFile(out, filename="sublya.mp4"),
+            width=w, height=h, duration=duration,
+            supports_streaming=True, reply_markup=result_keyboard(job.id),
+        )
 
     async def fail(self, job: Job, user_text: str, error: str, notify_admins: bool = False) -> None:
         await self.db.finish(job.id, "failed", error=error)
