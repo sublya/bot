@@ -3,6 +3,7 @@ whatever the team writes in that topic goes back to the user from the bot."""
 
 import asyncio
 import logging
+import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
@@ -28,6 +29,7 @@ log = logging.getLogger(__name__)
 router = Router()
 
 TOPIC_NAME_LIMIT = 128
+ACK_EVERY = 3600
 # what the team may send to a user; service messages of the topic itself stay in the group
 REPLY_TYPES = {
     ContentType.TEXT, ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION,
@@ -72,6 +74,20 @@ class Support:
         self.chat_id = chat_id
         # two quick messages from a new user must not open two topics
         self._locks: defaultdict[int, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._acked: dict[int, float] = {}
+
+    @property
+    def enabled(self) -> bool:
+        return self.chat_id is not None
+
+    def ack_due(self, user_id: int, now: float | None = None) -> bool:
+        """Whether to tell the user their message was passed on. Once an hour at most:
+        in a dialogue with the team the same words after every line are just noise."""
+        now = time.monotonic() if now is None else now
+        if now - self._acked.get(user_id, -ACK_EVERY) < ACK_EVERY:
+            return False
+        self._acked[user_id] = now
+        return True
 
     async def topic(self, user_id: int, who: User | None = None) -> int | None:
         async with self._locks[user_id]:

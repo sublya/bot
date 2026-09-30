@@ -187,6 +187,9 @@ async def test_groups_never_get_the_not_a_video_answer(bot, db):
     from sublya.bot.support import router as support_router
 
     dp = Dispatcher()
+    # the routers are module globals, and a router joins one dispatcher only
+    for r in (support_router, router):
+        r._parent_router = None
     dp.include_routers(support_router, router)
     update = Update(update_id=1, message=in_group(bot, "что-то", chat=Chat(id=-999, type="group")))
     await dp.feed_update(bot, update, db=db, support=Support(bot, db, GROUP))
@@ -222,3 +225,36 @@ async def test_outgoing_middleware_passes_the_result_through(db):
     bot.session.middleware(MirrorOutgoing(Recorder(bot, db, GROUP)))
     assert await bot.send_message(ALICE.id, "Готово.") is sent
     assert mirrored == [(ALICE.id, sent)]
+
+
+def test_ack_once_an_hour(support):
+    assert support.ack_due(ALICE.id, now=0)
+    assert not support.ack_due(ALICE.id, now=1800)
+    assert support.ack_due(ALICE.id, now=3600)
+    assert support.ack_due(8, now=1800)
+
+
+async def private_text(bot, db, support) -> list:
+    from aiogram import Dispatcher
+    from aiogram.types import Update
+
+    from sublya.bot.handlers import router
+    from sublya.bot.support import router as support_router
+
+    dp = Dispatcher()
+    # the routers are module globals, and a router joins one dispatcher only
+    for r in (support_router, router):
+        r._parent_router = None
+    dp.include_routers(support_router, router)
+    for i in range(2):
+        message = private("есть вопрос").model_copy(update={"message_id": 10 + i}).as_(bot)
+        await dp.feed_update(bot, Update(update_id=i, message=message), db=db, support=support)
+    return [a for a, _ in bot.named("reply")]
+
+
+async def test_text_goes_to_support_with_one_ack(bot, db):
+    assert await private_text(bot, db, Support(bot, db, GROUP)) == [(texts.FORWARDED,)]
+
+
+async def test_without_support_text_is_not_a_video(bot, db):
+    assert await private_text(bot, db, Support(bot, db, None)) == [(texts.NOT_VIDEO,)] * 2

@@ -19,7 +19,7 @@ from sublya.core import STYLES, Transcript
 from . import texts
 from .config import MB, Settings
 from .db import Busy, Db, Job, QuotaExceeded
-from .support import quiet
+from .support import Support, quiet
 from .worker import Worker, job_dir, result_keyboard
 
 log = logging.getLogger(__name__)
@@ -277,5 +277,10 @@ async def restyle(query: CallbackQuery, db: Db, worker: Worker, settings: Settin
 
 
 @router.message()
-async def fallback(message: Message) -> None:
-    await message.answer(texts.NOT_VIDEO)
+async def fallback(message: Message, support: Support) -> None:
+    # with a support chat anything but a video is a message for the team, and it is already
+    # in the user's topic
+    if not support.enabled:
+        await message.answer(texts.NOT_VIDEO)
+    elif support.ack_due(message.from_user.id):
+        await message.answer(texts.FORWARDED)
