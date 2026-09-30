@@ -60,7 +60,14 @@
     transform: translate(-50%, calc(-100% - 8px)); display: none;
   }
   .list { padding: 0; }
-  .row { display: flex; gap: 10px; align-items: baseline; padding: 11px 16px; border-top: 1px solid var(--line); }
+  .row { display: flex; gap: 12px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
+  .avatar {
+    flex: none; width: 38px; height: 38px; border-radius: 50%; overflow: hidden;
+    display: grid; place-items: center; font-size: 14px; font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  a { color: var(--accent); text-decoration: none; }
   .row:first-child { border-top: 0; }
   .row .main { flex: 1; min-width: 0; }
   .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -105,7 +112,47 @@ const dayLabel = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("ru-RU
   { day: "numeric", month: "short", timeZone: "UTC" });
 const shortDay = (iso) => new Date(iso + "T00:00:00Z").toLocaleDateString("ru-RU",
   { day: "numeric", month: "numeric", timeZone: "UTC" });
-const who = (u) => u.name || (u.username ? "@" + u.username : "id " + (u.id ?? u.user_id));
+const who = (u) => u.name || (u.username ? "@" + u.username : "id " + u.user_id);
+const initials = (u) => (u.name || u.username || "?").split(/\s+/).slice(0, 2)
+  .map((w) => w[0]).join("").toUpperCase();
+const auth = () => ({ Authorization: "tma " + (tg?.initData || "") });
+
+// fetched with the signature header, which <img src> can't send; kept across refreshes
+const avatars = new Map();
+function avatar(u) {
+  if (!avatars.has(u.user_id)) {
+    avatars.set(u.user_id, fetch(`/admin/api/avatar/${u.user_id}`, { headers: auth() })
+      .then((r) => r.ok ? r.blob() : null)
+      .then((b) => b && URL.createObjectURL(b))
+      .catch(() => null));
+  }
+  const box = el("div", { class: "avatar" }, initials(u));
+  avatars.get(u.user_id).then((url) => url && box.replaceChildren(el("img", { src: url, alt: "" })));
+  return box;
+}
+
+function link(text, url) {
+  const a = el("a", { href: url }, text);
+  a.addEventListener("click", (e) => {
+    // inside Telegram t.me links open in the app itself instead of the browser
+    if (tg?.openTelegramLink) { e.preventDefault(); tg.openTelegramLink(url); }
+  });
+  return a;
+}
+
+// a profile link needs a username; without one the support topic is the way to the person
+function person(u, prefix = "") {
+  return u.username ? link(prefix + who(u), `https://t.me/${u.username}`) : prefix + who(u);
+}
+function contacts(u) {
+  const parts = [];
+  if (u.username) parts.push("@" + u.username);
+  if (u.topic && supportChat) {
+    parts.push(link("переписка", `https://t.me/c/${String(supportChat).replace(/^-100/, "")}/${u.topic}`));
+  }
+  return parts.flatMap((p, i) => i ? [", ", p] : [p]);
+}
+let supportChat = null;
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -192,6 +239,7 @@ function render(data) {
   const app = document.getElementById("app");
   const or = data.openrouter;
   const u = data.users, v = data.videos, stt = data.stt_minutes;
+  supportChat = data.support_chat_id;
   const sttShare = Math.min(100, stt.today / data.stt_limit * 100);
 
   const hero = el("div", { class: "card hero" },
@@ -213,17 +261,17 @@ function render(data) {
       data.queue.running ? "одно видео в работе" : "никто не ждёт"));
 
   const top = el("div", { class: "card list" }, data.top.length ? data.top.map((t) =>
-    el("div", { class: "row" },
+    el("div", { class: "row" }, avatar(t),
       el("div", { class: "main" },
-        el("div", { class: "name" }, who(t)),
-        el("div", { class: "sub" }, `${t.username ? "@" + t.username + ", " : ""}последнее ${when(t.last)}`)),
+        el("div", { class: "name" }, person(t)),
+        el("div", { class: "sub" }, contacts(t), contacts(t).length ? ", " : "", `последнее ${when(t.last)}`)),
       el("div", { class: "num" }, `${t.done} / ${t.videos}`))) : el("div", { class: "empty" }, "Пока никого"));
 
   const recent = el("div", { class: "card list" }, data.recent.length ? data.recent.map((j) => {
     const took = j.finished_at ? Math.round(j.finished_at - j.created_at) + " с" : "";
-    return el("div", { class: "row" },
+    return el("div", { class: "row" }, avatar(j),
       el("div", { class: "main" },
-        el("div", { class: "name" }, `#${j.id} ${who(j)}`),
+        el("div", { class: "name" }, person(j, `#${j.id} `)),
         el("div", { class: "sub" }, [when(j.created_at), STYLE[j.style] || j.style,
           j.rerender ? "перерендер" : null, took].filter(Boolean).join(", ")),
         j.error && el("div", { class: "err" }, j.error)),
@@ -243,7 +291,7 @@ async function load() {
   button.disabled = true;
   try {
     const res = await fetch("/admin/api/stats", {
-      headers: { Authorization: "tma " + (tg?.initData || "") },
+      headers: auth(),
     });
     if (res.status === 401) throw new Error("Открой админку кнопкой в боте: без подписи Telegram данные не отдаются.");
     if (res.status === 403) throw new Error("У этого аккаунта нет доступа к админке.");

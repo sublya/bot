@@ -60,7 +60,7 @@ async def run() -> None:
     await bot.set_my_commands(COMMANDS)
     panel = None
     if settings.admin_url:
-        panel = await serve(db, settings)
+        panel = await serve(bot, db, settings)
         await admin_menu(bot, settings)
     tasks = [asyncio.create_task(worker.run()), asyncio.create_task(cleanup_loop(settings))]
     for task in tasks:
