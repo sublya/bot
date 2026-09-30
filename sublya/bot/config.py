@@ -19,6 +19,8 @@ class Settings:
     api_url: str | None = None  # local telegram-bot-api server, e.g. http://telegram-bot-api:8081
     data_dir: Path = Path("data")
     admin_ids: frozenset[int] = frozenset()
+    # forum group where every user gets a topic with their dialogue; None turns support off
+    support_chat_id: int | None = None
     daily_videos: int = 10
     stt_daily_minutes: float = 300
     stt_lag: float | None = None  # None: the default for the transcript's timing kind
@@ -43,6 +45,7 @@ class Settings:
             api_url=env.get("TELEGRAM_API_URL") or None,
             data_dir=Path(env.get("DATA_DIR", "data")),
             admin_ids=_ids(env.get("ADMIN_IDS", "")),
+            support_chat_id=int(env["SUPPORT_CHAT_ID"]) if env.get("SUPPORT_CHAT_ID") else None,
             daily_videos=int(env.get("DAILY_VIDEOS", 10)),
             stt_daily_minutes=float(env.get("STT_DAILY_MINUTES", 300)),
             stt_lag=float(env["STT_LAG"]) if env.get("STT_LAG") else None,

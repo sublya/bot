@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS usage (
     stt_seconds REAL NOT NULL DEFAULT 0,
     PRIMARY KEY (day, user_id)
 );
+CREATE TABLE IF NOT EXISTS support_topics (
+    user_id INTEGER PRIMARY KEY,
+    topic_id INTEGER NOT NULL UNIQUE,
+    created_at REAL NOT NULL
+);
 """
 
 ACTIVE = ("pending", "queued", "running")
@@ -228,6 +233,24 @@ class Db:
             "stt_minutes_today": round(usage["stt"] / 60, 1),
             "queued": jobs["queued"] or 0, "failed_today": jobs["failed"] or 0,
         }
+
+    async def get_topic(self, user_id: int) -> int | None:
+        row = await self._one("SELECT topic_id FROM support_topics WHERE user_id = ?", user_id)
+        return row["topic_id"] if row else None
+
+    async def set_topic(self, user_id: int, topic_id: int | None) -> None:
+        """None forgets the topic, so the next message opens a new one."""
+        if topic_id is None:
+            await self.conn.execute("DELETE FROM support_topics WHERE user_id = ?", (user_id,))
+            return
+        await self.conn.execute(
+            "INSERT OR REPLACE INTO support_topics (user_id, topic_id, created_at) VALUES (?, ?, ?)",
+            (user_id, topic_id, self.clock()),
+        )
+
+    async def user_by_topic(self, topic_id: int) -> int | None:
+        row = await self._one("SELECT user_id FROM support_topics WHERE topic_id = ?", topic_id)
+        return row["user_id"] if row else None
 
     @asynccontextmanager
     async def _transaction(self) -> AsyncIterator[None]:

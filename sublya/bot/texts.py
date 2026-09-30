@@ -50,7 +50,17 @@ STT_FAILED = "Не получилось распознать речь. Попр�
 RENDER_FAILED = "Не получилось собрать видео. Я уже сообщил разработчику."
 FAILED = "Что-то сломалось. Я уже сообщил разработчику."
 
-ADMIN_ERROR = "Задача {job_id} (user {user_id}) упала: {error}"
+SUPPORT_CARD = """<b>{name}</b>
+{username}id <code>{id}</code>, язык Telegram: {tg_lang}
+
+<i>Здесь вся переписка с пользователем. Что напишешь в эту тему, бот отправит ему от своего имени. Сообщения с / не уходят.</i>"""
+SUPPORT_BOT = "🤖 {text}"
+SUPPORT_BUTTON = "🔘 {text}"
+SUPPORT_NO_USER = "⚠️ Эта тема ни к кому не привязана, сообщение не ушло."
+SUPPORT_BLOCKED = "⚠️ Не доставлено: пользователь заблокировал бота."
+SUPPORT_FAILED = "⚠️ Не доставлено: {error}"
+
+ADMIN_ERROR ="Задача {job_id} (user {user_id}) упала: {error}"
 STATS = """Сегодня:
 пользователей {users_today} (всего {users_total})
 видео {videos_today}
