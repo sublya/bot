@@ -301,16 +301,18 @@ class Db:
             by_day[row["day"]]["new_users"] = row["n"]
 
         top = await self._all(
-            "SELECT u.id, u.name, u.username, COUNT(j.id) AS videos,"
+            "SELECT u.id AS user_id, u.name, u.username, t.topic_id AS topic, COUNT(j.id) AS videos,"
             " SUM(j.status = 'done') AS done, MAX(j.created_at) AS last"
             " FROM users u JOIN jobs j ON j.user_id = u.id AND j.parent_id IS NULL"
+            " LEFT JOIN support_topics t ON t.user_id = u.id"
             " GROUP BY u.id ORDER BY videos DESC, last DESC LIMIT 10"
         )
         recent = await self._all(
-            "SELECT j.id, j.user_id, u.name, u.username, j.status, j.style,"
+            "SELECT j.id, j.user_id, u.name, u.username, t.topic_id AS topic, j.status, j.style,"
             " j.parent_id IS NOT NULL AS rerender, j.created_at, j.finished_at,"
             " substr(j.error, 1, 300) AS error"
-            " FROM jobs j LEFT JOIN users u ON u.id = j.user_id ORDER BY j.id DESC LIMIT 20"
+            " FROM jobs j LEFT JOIN users u ON u.id = j.user_id"
+            " LEFT JOIN support_topics t ON t.user_id = j.user_id ORDER BY j.id DESC LIMIT 20"
         )
         return {
             "users": {**dict(users), "active_today": active["today"], "active_week": active["week"]},
